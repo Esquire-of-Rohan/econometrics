@@ -1,0 +1,188 @@
+library(tidyverse)
+library(broom)
+library(lmtest)
+library(readxl)
+library(reshape2)
+library(dplyr)
+library(tm)
+library(stringr)
+
+data_leg <- read_xls("table2.xls",skip = 5)
+names(data_leg)[names(data_leg) == '2016'] <- 'compensation'
+data_leg$compensation <- na_if(data_leg$compensation, "(D)")
+
+data_states <- read.csv("state_drugs.csv")
+
+data_leg2 <- read_xls("table3.xls",skip = 5)
+names(data_leg2)[names(data_leg2) == '2016'] <- 'money'
+
+#Personal income
+data_pincome <- data_leg2 %>% filter(Description == "Personal income (millions of dollars)") 
+names(data_pincome)[names(data_pincome) == 'Description'] <- 'delete'
+names(data_pincome)[names(data_pincome) == 'money'] <- 'Personal_income_mil'
+
+data_pincome <- data_pincome %>% select(Personal_income_mil,GeoName)
+names(data_pincome)[names(data_pincome) == 'GeoName'] <- 'State'
+
+data_states <- data_states %>% left_join(data_pincome,by = "State")
+
+
+
+
+#Population
+data_population <- data_leg2 %>% filter(Description == "Population (persons) 1/") 
+names(data_population)[names(data_population) == 'Description'] <- "Population (persons) 1/"
+names(data_population)[names(data_population) == 'money'] <- "number_of_people"
+data_population <- data_population %>% select(GeoName,number_of_people)
+
+names(data_population)[names(data_population) == 'GeoName'] <- "State"
+
+
+data_states <- data_states %>% left_join(data_population,by = "State")
+
+
+data_states <- data_states %>% mutate(per_capita_income = 1000000*Personal_income_mil/number_of_people)
+
+data_leg <- data_leg %>% select(-GeoFips,-LineCode)
+data_museums <- data_leg %>% filter(Description =="Museums")
+names(data_museums)[names(data_museums) == 'GeoName'] <- "State"
+data_states <- data_states %>% left_join(data_museums,by = "State") 
+data_states <- data_states %>% select(-Description)
+names(data_states)[names(data_states) == 'compensation'] <- "compensation_museums"
+data_states$compensation_museums <- as.numeric(data_states$compensation_museums)
+data_states$compensation_museums <- data_states$compensation_museums*1000
+
+
+
+
+
+
+consumption <- read_xls("consumption.xls", skip = 5)
+names(consumption)[names(consumption) == '2016'] <- 'money_mln'
+names(consumption)[names(consumption) == 'GeoName'] <- "State"
+
+consumption_food <- consumption %>% filter(Description == "Food and beverages purchased for off-premises consumption")
+consumption_food <- consumption_food %>% select(State, money_mln)
+names(consumption_food)[names(consumption_food) == 'money_mln'] <- 'food_and_bev_purchased_dol'
+consumption_food$food_and_bev_purchased_dol <- consumption_food$food_and_bev_purchased_dol*1000000
+
+data_states <- data_states %>% left_join(consumption_food,by = "State")
+
+
+consumption_cloth <- consumption %>% filter(Description == "Clothing and footwear")
+consumption_cloth <- consumption_cloth %>% select(State, money_mln)
+names(consumption_cloth)[names(consumption_cloth) == 'money_mln'] <-'clothes_footwear_dol'
+consumption_cloth$clothes_footwear_dol <- consumption_cloth$clothes_footwear_dol*1000000
+
+
+data_states <- data_states %>% left_join(consumption_cloth,by = "State")
+
+
+
+
+real_gdp <- read_xls('real_gdp.xls', skip=5)
+real_gdp <- real_gdp %>% filter(Description == "Real GDP (millions of chained 2012 dollars)")
+real_gdp$total_real_gdp <- 1000000*(real_gdp$`2016:Q1` + real_gdp$`2016:Q2` + real_gdp$`2016:Q3` + real_gdp$`2016:Q4`)
+
+real_gdp <- real_gdp %>% select(GeoName,total_real_gdp)
+names(real_gdp)[names(real_gdp) == 'GeoName'] <-'State'
+
+
+
+data_states <- data_states %>% left_join(real_gdp,by = "State")
+
+
+
+
+crime <- read_xls("crime.xls", skip=3)
+crime <- crime %>% filter(Area == "State Total") %>% select(-'...3' ,-Area, -Population, -'...15',-'...16')
+
+crime$State <- removeNumbers(crime$State)
+crime$State <- str_to_title(crime$State)
+data_states <- data_states %>% left_join(crime,by = "State")
+
+fine_arts <-read_xls("fine_art.xls", skip=5) %>% select(-GeoFips)
+names(fine_arts)[names(fine_arts) == 'GeoName'] <-'State'
+names(fine_arts)[names(fine_arts) == '2016'] <-'fine_arts_compensation'
+
+fine_arts$fine_arts_compensation <- as.numeric(fine_arts$fine_arts_compensation)*1000
+
+
+data_states <- data_states %>% left_join(fine_arts,by = "State")
+
+
+
+support <-read_xls("support.xls", skip=5) %>% select(-GeoFips)
+names(support)[names(support) == 'GeoName'] <-'State'
+names(support)[names(support) == '2016'] <-'arts_cltr_sup'
+
+support$arts_cltr_sup <- as.numeric(support$arts_cltr_sup)*1000
+
+
+data_states <- data_states %>% left_join(support,by = "State")
+
+
+
+motion <-read_xls("motion_pictures.xls", skip=5) %>% select(-GeoFips)
+names(motion)[names(motion) == 'GeoName'] <-'State'
+names(motion)[names(motion) == '2016'] <-'motion_pictures'
+
+motion$motion_pictures <- as.numeric(motion$motion_pictures)*1000
+
+
+data_states <- data_states %>% left_join(motion,by = "State")
+
+
+
+ed <-read_xls("motion_pictures.xls", skip=5) %>% select(-GeoFips)
+names(ed)[names(ed) == 'GeoName'] <-'State'
+names(ed)[names(ed) == '2016'] <-'education_services'
+
+ed$education_services <- as.numeric(ed$education_services)*1000
+
+
+data_states <- data_states %>% left_join(ed,by = "State")
+
+names(data_states)[names(data_states) == 'Larceny-\ntheft'] <-'Larceny_theft'
+names(data_states)[names(data_states) == 'Motor \nvehicle \ntheft'] <-'motor_vehicle_theft'
+names(data_states)[names(data_states) == 'Property \ncrime'] <-'property_crime'
+names(data_states)[names(data_states) == 'Murder and \nnonnegligent \nmanslaughter'] <-'murder_and'
+
+names(data_states)[names(data_states) == 'Rape\n(legacy\ndefinition3)'] <-'rape1'
+names(data_states)[names(data_states) == 'Rape\n(revised\ndefinition2)'] <-'rape2'
+names(data_states)[names(data_states) == 'Aggravated \nassault'] <-'assault'
+
+
+
+data_states <- data_states %>% mutate(minor_crimes = Larceny_theft + motor_vehicle_theft +property_crime) 
+
+data_states <- data_states %>% select(-Larceny_theft, -motor_vehicle_theft, -property_crime, -Personal_income_mil,-murder_and,-Burglary,-rape1,-rape2,-assault)
+
+emp <-read_xls("employ.xls", skip=5) %>% select(-GeoFips)
+names(emp)[names(emp) == 'GeoName'] <-'State'
+names(emp)[names(emp) == '2016'] <-'employment'
+
+
+data_states <- data_states %>% left_join(emp,by = "State")
+
+
+library(writexl)
+write_xlsx(data_states,"data_states_updated.xlsx")
+
+
+#Then we visualize our data
+
+library(readxl)
+library(ggplot2)
+library(dplyr)
+
+data <- read_xlsx("data_states_updated.xlsx")
+
+#Graph number one
+ggplot(data, aes(x=No.laws.legalizing.marijuana, y=total_real_gdp)) +
+  geom_boxplot() + xlab("Наличие законов, запрещающих употребление марихуаны") + ylab("Реальный ВВП")+ scale_x_discrete(labels=c("True", "False")) + theme_light()
+  
+#Graph number two
+
+ggplot(data, aes(x=No.laws.legalizing.marijuana, y=per_capita_income)) +
+  geom_boxplot() + xlab("Наличие законов, запрещающих употребление марихуаны") + ylab("Доход на душу населения")+ scale_x_discrete(labels=c("True", "False")) + theme_light()
