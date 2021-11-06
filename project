@@ -1,3 +1,19 @@
+######################################################################
+#                                                                    #
+#                         Эконометрика                               #
+#                                                                    #                                                                    
+#                 Влияние легализации наркотиков в США               #
+#                     на благосостояние штата                        #
+#                                                                    #
+#                                                                    #
+#                                                                    #
+#                                                                    #
+#                                                                    #
+#                                                                    #
+
+#Загружаем библиотеки
+
+
 library(tidyverse)
 library(broom)
 library(lmtest)
@@ -6,6 +22,10 @@ library(reshape2)
 library(dplyr)
 library(tm)
 library(stringr)
+library(writexl)
+
+#Загружаем данные с сайта bea.gov
+#Вся дальнейшай загрука данных происходит с этого сайта, если не указано иначе
 
 data_leg <- read_xls("table2.xls",skip = 5)
 names(data_leg)[names(data_leg) == '2016'] <- 'compensation'
@@ -166,7 +186,7 @@ names(emp)[names(emp) == '2016'] <-'employment'
 data_states <- data_states %>% left_join(emp,by = "State")
 
 
-library(writexl)
+
 write_xlsx(data_states,"data_states_updated.xlsx")
 
 
